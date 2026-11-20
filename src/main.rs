@@ -178,6 +178,13 @@ enum Cmd {
     },
     /// Start the stdio JSON-RPC 2.0 MCP server.
     Mcp,
+    /// Start the HTTP MCP server (`GET /health`, `POST /mcp`) for remote clients.
+    ServeHttp {
+        #[arg(long, default_value = "0.0.0.0")]
+        host: String,
+        #[arg(long, default_value_t = 8080)]
+        port: u16,
+    },
 }
 
 #[derive(Subcommand)]
@@ -734,6 +741,10 @@ fn run() -> Result<ExitCode> {
         }
         Cmd::Mcp => {
             mcp::serve()?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::ServeHttp { host, port } => {
+            radar30::http_server::serve(&host, port)?;
             Ok(ExitCode::SUCCESS)
         }
     }

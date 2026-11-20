@@ -13,6 +13,7 @@ pub mod discover;
 pub mod doctor;
 pub mod fusion;
 pub mod http;
+pub mod http_server;
 pub mod library;
 pub mod mcp;
 pub mod mcp_prompts;

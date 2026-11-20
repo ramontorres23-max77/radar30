@@ -3,12 +3,12 @@
   "name": "io.github.radar30/radar30",
   "title": "radar30",
   "description": "Multi-source, engagement-scored research engine for the last 30 days across Reddit, Hacker News, GitHub, Polymarket, DEV.to, and arXiv.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "packages": [
     {
       "registryType": "oci",
       "identifier": "radar30",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "transport": {
         "type": "stdio"
       },

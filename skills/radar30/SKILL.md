@@ -53,4 +53,6 @@ primary entity, fuses per-source rankings via Weighted Reciprocal Rank Fusion
 
 6. **Troubleshoot:**
    Run `radar30 doctor` (or MCP tool `radar30_doctor`) to inspect binary health,
-   agent registrations, and the live MCP self-test.
+   agent registrations, and the live MCP self-test. For remote clients, the same
+   JSON-RPC surface is served over HTTP by `radar30 serve-http` (`POST /mcp`,
+   `GET /health`) behind the Easypanel HTTPS proxy.
