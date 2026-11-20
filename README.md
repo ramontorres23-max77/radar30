@@ -19,6 +19,13 @@ Prebuilt binaries (macOS arm64/x86_64, Linux x86_64, Windows x86_64) are attache
 cargo install --git https://github.com/ramontorres23-max77/radar30
 ```
 
+On macOS you can also build a double-clickable `Radar30.app` (a thin launcher for the CLI, with a menu for quick search, company intel and doctor):
+
+```bash
+./scripts/build-macos-app.sh        # produces dist/Radar30.app
+open dist/Radar30.app
+```
+
 Register with local coding agents (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes):
 
 ```bash
