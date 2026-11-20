@@ -13,6 +13,12 @@ cargo build --release
 ./target/release/radar30 doctor
 ```
 
+Prebuilt binaries (macOS arm64/x86_64, Linux x86_64, Windows x86_64) are attached to each [GitHub release](https://github.com/ramontorres23-max77/radar30/releases). To build from source without a release:
+
+```bash
+cargo install --git https://github.com/ramontorres23-max77/radar30
+```
+
 Register with local coding agents (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes):
 
 ```bash

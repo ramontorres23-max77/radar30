@@ -38,7 +38,7 @@ What works today and how each part was last checked. Updated 2026-11-19.
 | Component | Status | Notes |
 | --- | --- | --- |
 | Company intel jobs & finance (`src/company.rs`, `radar30/company@1`) | Verified | Live `company Stripe` returned 20 Greenhouse postings with a `Jobs Page Secret Signal` hit; live `company Apple` produced `AAPL -1.9% over 30d vs VOO -3.0%` from Nasdaq. |
-| Company intel patents (`src/company.rs`) | Tested | Parser/filter tests pass and an earlier direct probe returned 200; repeated live runs hit Google Patents HTTP 503 (rate limit), reported as a warning rather than fabricated data. |
+| Company intel patents (`src/company.rs`) | Verified | Google Patents was rate-limited (503) in live runs; the anonymous USPTO session fallback returned 12 real US publications for Stripe with dates and assignees. Cache path tested live in a scratch DB path. |
 | `radar30_company` MCP tool & 8-tool self-test | Verified | `docs/tools.md` regenerated from registry; stdio + HTTP health report 8 tools; `doctor` PASS. |
 | Local HTML publisher (`radar30 publish`) | Verified | Saved brief rendered to standalone `.html` in a scratch directory. |
 

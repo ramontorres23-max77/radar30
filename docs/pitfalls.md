@@ -27,4 +27,4 @@ Mistakes and upstream quirks documented as concrete rules so they are never repe
 - **Greenhouse `content=true` can return 6 MB per board.** Request `content=false` (~0.5 MB) and stay under the HTTP response cap.
 - **Google Patents XHR returns `&hellip;` and assignees in several shapes.** Decode entities and handle string/array/object assignees before rendering.
 - **Do not call patent results "first US publications" without family data.** The digest reports US publication numbers and priority dates only.
-- **Google Patents XHR can return HTTP 503 after repeated probes.** Keep it as a warning in the report; never synthesize an empty-but-successful patent section when the endpoint refused the request.
+- **Google Patents XHR can return HTTP 503 after repeated probes.** Fall back to the anonymous USPTO session (`/api/users/me/session` + `/api/searches/searchWithBeFamily`), then to a 24h cache; never synthesize an empty-but-successful patent section.

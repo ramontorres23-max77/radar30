@@ -2,7 +2,9 @@
 //! and a 30-day stock-vs-benchmark line. Designed for local runs with no API keys.
 
 use std::fmt::Write as _;
-use std::time::{Duration, Instant};
+use std::hash::{Hash, Hasher};
+use std::io::Read as _;
+use std::time::{Duration, Instant, SystemTime};
 
 use anyhow::Result;
 use chrono::{NaiveDate, Utc};
@@ -48,6 +50,8 @@ pub struct PatentItem {
     pub priority_date: Option<String>,
     pub url: String,
     pub is_candidate_signal: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub from_cache: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -104,14 +108,11 @@ pub fn run(opts: &CompanyOptions) -> Result<CompanyReport> {
     let timeout = opts.timeout.min(Duration::from_secs(20));
     let mut warnings = Vec::new();
 
-    // 1. Patent Digest — Google Patents XHR, filtered to US publications in window.
-    let patents = match fetch_patents(company, opts.window, timeout, deadline) {
-        Ok(p) => p,
-        Err(e) => {
-            warnings.push(format!("patents: {e}"));
-            Vec::new()
-        }
-    };
+    // 1. Patent Digest — Google Patents XHR, USPTO anonymous session fallback, then 24h cache.
+    let (patents, patent_note) = fetch_patents_resilient(company, opts.window, timeout, deadline);
+    if let Some(note) = patent_note {
+        warnings.push(format!("patents: {note}"));
+    }
 
     // 2. Jobs Digest — careers boards (Greenhouse, Ashby, Lever, Workday).
     let boards = resolve_boards(company, opts.boards_override.as_deref());
@@ -234,6 +235,7 @@ fn fetch_patents(
             out.push(PatentItem {
                 url: format!("https://patents.google.com/patent/{number}/en"),
                 is_candidate_signal: is_candidate_patent(&p.title),
+                from_cache: false,
                 title: decode_html_entities(&p.title),
                 assignee: value_to_text(p.assignee.as_ref()),
                 priority_date: p.priority_date,
@@ -249,6 +251,277 @@ fn fetch_patents(
     }
     out.sort_by(|a, b| b.priority_date.cmp(&a.priority_date));
     Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// Patent resilience: USPTO anonymous session fallback + 24h local cache
+// ---------------------------------------------------------------------------
+
+const USPTO_BASE: &str = "https://ppubs.uspto.gov";
+const USPTO_UA: &str = "Mozilla/5.0 (research-cli)";
+
+#[derive(Serialize, Deserialize)]
+struct PatentCache {
+    fetched_at: String,
+    patents: Vec<PatentItem>,
+}
+
+fn fetch_patents_resilient(
+    company: &str,
+    window: DateWindow,
+    timeout: Duration,
+    deadline: Instant,
+) -> (Vec<PatentItem>, Option<String>) {
+    let mut notes: Vec<String> = Vec::new();
+
+    match fetch_patents(company, window, timeout, deadline) {
+        Ok(items) if !items.is_empty() => {
+            write_patent_cache(company, window, &items);
+            return (items, None);
+        }
+        Ok(_) => notes.push("Google Patents returned no US publications".to_string()),
+        Err(e) => notes.push(format!("Google Patents unavailable ({e})")),
+    }
+
+    match fetch_patents_uspto(company, window, timeout, deadline) {
+        Ok(items) if !items.is_empty() => {
+            write_patent_cache(company, window, &items);
+            notes.push("used USPTO anonymous fallback".to_string());
+            return (items, Some(notes.join("; ")));
+        }
+        Ok(_) => notes.push("USPTO fallback returned no publications".to_string()),
+        Err(e) => notes.push(format!("USPTO fallback failed ({e})")),
+    }
+
+    if let Some(mut cached) = read_patent_cache(company, window) {
+        notes.push("served 24h local cache".to_string());
+        for p in &mut cached {
+            p.from_cache = true;
+        }
+        return (cached, Some(notes.join("; ")));
+    }
+
+    (Vec::new(), Some(notes.join("; ")))
+}
+
+fn fetch_patents_uspto(
+    company: &str,
+    window: DateWindow,
+    timeout: Duration,
+    deadline: Instant,
+) -> Result<Vec<PatentItem>, HttpError> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(timeout))
+        .http_status_as_error(false)
+        .user_agent(USPTO_UA)
+        .build()
+        .into();
+
+    let mut session_resp = agent
+        .post(&format!("{USPTO_BASE}/api/users/me/session"))
+        .header("Content-Type", "application/json")
+        .header("Referer", &format!("{USPTO_BASE}/pubwebapp/"))
+        .header("Origin", USPTO_BASE)
+        .header("X-Access-Token", "null")
+        .send("-1")
+        .map_err(|e| HttpError::Unreachable {
+            detail: format!("USPTO session: {e}"),
+        })?;
+    if !(200..300).contains(&session_resp.status().as_u16()) {
+        return Err(HttpError::Forbidden {
+            detail: format!("USPTO session HTTP {}", session_resp.status().as_u16()),
+        });
+    }
+    let token = session_resp
+        .headers()
+        .get("x-access-token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    if token.is_empty() {
+        return Err(HttpError::Forbidden {
+            detail: "USPTO session returned no x-access-token".to_string(),
+        });
+    }
+    let session_body: Value = {
+        let mut text = String::new();
+        session_resp
+            .body_mut()
+            .as_reader()
+            .read_to_string(&mut text)
+            .map_err(|e| HttpError::Decode {
+                detail: format!("USPTO session body: {e}"),
+            })?;
+        serde_json::from_str(&text).map_err(|e| HttpError::Decode {
+            detail: format!("USPTO session JSON: {e}"),
+        })?
+    };
+    let case_id = json_text(session_body.get("userCase").and_then(|c| c.get("caseId")));
+    if case_id.is_empty() {
+        return Err(HttpError::Forbidden {
+            detail: "USPTO session returned no caseId".to_string(),
+        });
+    }
+
+    let query = format!(
+        "(\"{company}\").aanm. AND @pd>=\"{}\"<=\"{}\"",
+        window.from.format("%Y%m%d"),
+        window.to.format("%Y%m%d")
+    );
+    let body = json!({
+        "start": 0,
+        "pageCount": 12,
+        "sort": "date_publ desc",
+        "docFamilyFiltering": "noFiltering",
+        "searchType": 1,
+        "familyIdEnglishOnly": true,
+        "familyIdFirstPreferred": "US-PGPUB",
+        "familyIdSecondPreferred": "USPAT",
+        "familyIdThirdPreferred": "FPRS",
+        "showDocPerFamilyPref": "showEnglish",
+        "queryId": 0,
+        "tagDocSearch": false,
+        "query": {
+            "caseId": case_id,
+            "hl_snippets": "2",
+            "op": "OR",
+            "q": query,
+            "queryName": query,
+            "highlights": "0",
+            "qt": "brs",
+            "spellCheck": false,
+            "viewName": "tile",
+            "plurals": true,
+            "britishEquivalents": true,
+            "databaseFilters": [{"databaseName": "US-PGPUB", "countryCodes": []}],
+            "searchType": 1,
+            "ignorePersist": true,
+            "userEnteredQuery": query,
+        }
+    });
+    let referer = format!("{USPTO_BASE}/pubwebapp/");
+    let headers = [
+        ("User-Agent", USPTO_UA),
+        ("Content-Type", "application/json"),
+        ("Referer", referer.as_str()),
+        ("Origin", USPTO_BASE),
+        ("X-Access-Token", token.as_str()),
+    ];
+    let url = format!("{USPTO_BASE}/api/searches/searchWithBeFamily");
+    let data: Value = http::post_json(&url, &headers, &body, timeout, deadline, 1)?;
+
+    let mut out: Vec<PatentItem> = data["patents"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|row| {
+            let raw_number = json_text(row.get("publicationReferenceDocumentNumber"));
+            if raw_number.is_empty() {
+                return None;
+            }
+            let number = if raw_number.to_ascii_uppercase().starts_with("US") {
+                raw_number
+            } else {
+                format!("US{raw_number}")
+            };
+            let date = json_text(row.get("datePublished"));
+            Some(PatentItem {
+                url: format!("https://patents.google.com/patent/{number}/en"),
+                is_candidate_signal: is_candidate_patent(&json_text(row.get("inventionTitle"))),
+                from_cache: false,
+                title: strip_tags(&json_text(row.get("inventionTitle"))),
+                assignee: json_text(row.get("applicantName")),
+                priority_date: date.get(..10).map(ToOwned::to_owned),
+                number,
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| b.priority_date.cmp(&a.priority_date));
+    out.dedup_by(|a, b| a.number == b.number);
+    out.truncate(12);
+    Ok(out)
+}
+
+fn json_text(v: Option<&Value>) -> String {
+    match v {
+        Some(Value::String(s)) => s.trim().to_string(),
+        Some(Value::Array(arr)) => arr.first().map(|v| json_text(Some(v))).unwrap_or_default(),
+        Some(Value::Object(map)) => map
+            .get("value")
+            .or_else(|| map.get("text"))
+            .map(|v| json_text(Some(v)))
+            .unwrap_or_default(),
+        Some(n @ Value::Number(_)) => n.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn strip_tags(s: &str) -> String {
+    s.replace("<b>", "")
+        .replace("</b>", "")
+        .replace("<br>", " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn patent_cache_path(company: &str, window: DateWindow) -> std::path::PathBuf {
+    let key = format!(
+        "{}|{}|{}",
+        company.trim().to_ascii_lowercase(),
+        window.from,
+        window.to
+    );
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    key.hash(&mut hasher);
+    crate::store::default_db_path()
+        .map(|p| {
+            p.parent()
+                .unwrap_or(std::path::Path::new("."))
+                .join("patents-cache")
+                .join(format!("{:016x}.json", hasher.finish()))
+        })
+        .unwrap_or_else(|_| {
+            std::path::PathBuf::from("radar30-patents-cache")
+                .join(format!("{:016x}.json", hasher.finish()))
+        })
+}
+
+fn write_patent_cache(company: &str, window: DateWindow, patents: &[PatentItem]) {
+    let path = patent_cache_path(company, window);
+    if let Some(parent) = path.parent()
+        && std::fs::create_dir_all(parent).is_ok()
+    {
+        let cache = PatentCache {
+            fetched_at: Utc::now().to_rfc3339(),
+            patents: patents.to_vec(),
+        };
+        if let Ok(json) = serde_json::to_string(&cache) {
+            let _ = std::fs::write(&path, json);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+            }
+        }
+    }
+}
+
+fn read_patent_cache(company: &str, window: DateWindow) -> Option<Vec<PatentItem>> {
+    let path = patent_cache_path(company, window);
+    let age = SystemTime::now()
+        .duration_since(std::fs::metadata(&path).ok()?.modified().ok()?)
+        .ok()?;
+    if age > Duration::from_secs(24 * 3600) {
+        return None;
+    }
+    let text = std::fs::read_to_string(path).ok()?;
+    let cache: PatentCache = serde_json::from_str(&text).ok()?;
+    (!cache.patents.is_empty()).then_some(cache.patents)
+}
+
+fn is_false(v: &bool) -> bool {
+    !*v
 }
 
 fn is_candidate_patent(title: &str) -> bool {
@@ -618,11 +891,14 @@ fn render_text(report: &CompanyReport, markdown: bool) -> String {
         let _ = write!(out, "{}", bullet("No US publications found in the window."));
     } else {
         for p in &report.patents {
-            let flag = if p.is_candidate_signal {
-                " [candidate signal]"
-            } else {
-                ""
-            };
+            let mut flags = String::new();
+            if p.is_candidate_signal {
+                flags.push_str(" [candidate signal]");
+            }
+            if p.from_cache {
+                flags.push_str(" [from 24h cache]");
+            }
+            let flag = flags;
             let date = p.priority_date.as_deref().unwrap_or("undated");
             let _ = write!(
                 out,
