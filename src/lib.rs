@@ -6,10 +6,13 @@
 //! CLI commands, a zero-SDK stdio MCP server, atomic agent `setup`, `doctor`
 //! self-diagnostics, and an embedded `SKILL.md`.
 
+pub mod briefing;
 pub mod cluster;
+pub mod discover;
 pub mod doctor;
 pub mod fusion;
 pub mod http;
+pub mod library;
 pub mod mcp;
 pub mod mcp_prompts;
 pub mod pipeline;
@@ -20,3 +23,5 @@ pub mod schema;
 pub mod setup;
 pub mod signals;
 pub mod sources;
+pub mod store;
+pub mod watchlist;

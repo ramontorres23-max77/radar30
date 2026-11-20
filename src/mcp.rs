@@ -22,11 +22,15 @@ use anyhow::{Result, bail};
 use chrono::NaiveDate;
 use serde_json::{Value, json};
 
+use crate::briefing;
+use crate::discover;
+use crate::library;
 use crate::pipeline::{self, RunOptions};
 use crate::preflight;
 use crate::render;
 use crate::schema::{Depth, EmitFormat, SourceId};
 use crate::sources::{self, FixtureFetcher, LiveFetcher};
+use crate::store::{self, Store};
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
@@ -274,10 +278,76 @@ pub fn tools() -> Vec<Value> {
                     "depth": { "type": "string", "enum": ["quick", "default", "deep"], "description": "Result depth profile (default: default)." },
                     "sources": { "type": "string", "description": "Comma-separated sources (reddit, hackernews/hn, github/gh, polymarket/pm, devto, arxiv)." },
                     "emit": { "type": "string", "enum": ["compact", "md", "json"], "description": "Text output format (default: compact)." },
+                    "store": { "type": "boolean", "description": "Persist sightings into the SQLite research store (default: false)." },
+                    "db": { "type": "string", "description": "Optional SQLite database path override." },
                     "timeout_secs": { "type": "integer", "minimum": 3, "maximum": 120, "description": "Wall-clock budget in seconds (default: 25)." },
                     "offline_fixtures": { "type": "string", "description": "Optional local directory of <source>.json fixtures for offline deterministic runs." }
                 },
                 "required": ["topic"]
+            }
+        }),
+        json!({
+            "name": "radar30_discover",
+            "title": "Discover trending topics across HN and Reddit",
+            "description": "Run topic-less discovery over Hacker News and Reddit rivers, filter junk shapes, enforce the confidence floor, and return velocity-ranked trends or an honest nothing-solid outcome.",
+            "annotations": {
+                "title": "Discover trending topics across HN and Reddit",
+                "readOnlyHint": false,
+                "destructiveHint": false,
+                "idempotentHint": false,
+                "openWorldHint": true
+            },
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "domain": { "type": "string", "description": "Optional domain scope (e.g. 'AI agents', 'Rust'). Omit for global sweep." },
+                    "depth": { "type": "string", "enum": ["quick", "default", "deep"], "description": "Sweep depth profile (default: default)." },
+                    "no_queue": { "type": "boolean", "description": "Skip updating the persistent discovery topic queue." },
+                    "db": { "type": "string", "description": "Optional SQLite database path override." },
+                    "timeout_secs": { "type": "integer", "minimum": 5, "maximum": 120, "description": "Wall-clock budget in seconds (default: 25)." }
+                }
+            }
+        }),
+        json!({
+            "name": "radar30_library_search",
+            "title": "Search saved research briefs and SQLite findings offline",
+            "description": "Deterministically search saved Markdown briefs and SQLite FTS5 findings without touching the network.",
+            "annotations": {
+                "title": "Search saved research briefs and SQLite findings offline",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+            },
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Search terms." },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 100, "description": "Maximum results (default: 15)." },
+                    "briefs_dir": { "type": "string", "description": "Optional saved briefs directory override." },
+                    "db": { "type": "string", "description": "Optional SQLite database path override." }
+                },
+                "required": ["query"]
+            }
+        }),
+        json!({
+            "name": "radar30_briefing",
+            "title": "Generate a daily or weekly briefing from stored findings",
+            "description": "Aggregate new findings from watched topics in the SQLite store into a structured daily or weekly briefing.",
+            "annotations": {
+                "title": "Generate a daily or weekly briefing from stored findings",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+            },
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "weekly": { "type": "boolean", "description": "Generate 7-day weekly digest instead of daily (default: false)." },
+                    "since": { "type": "string", "description": "Optional lower date bound YYYY-MM-DD." },
+                    "db": { "type": "string", "description": "Optional SQLite database path override." }
+                }
             }
         }),
         json!({
@@ -382,9 +452,74 @@ fn call_tool(name: &str, args: &Value) -> Result<(String, Value)> {
                 let fetcher = LiveFetcher::default();
                 pipeline::run(&opts, &fetcher)?
             };
+            if args["store"].as_bool().unwrap_or(false) {
+                let db_path = match args["db"].as_str().filter(|s| !s.trim().is_empty()) {
+                    Some(p) => PathBuf::from(p),
+                    None => store::default_db_path()?,
+                };
+                let mut st = Store::open(&db_path)?;
+                let _ = st.record_report(&report)?;
+            }
             let rendered = render::render(&report, emit)?;
             let structured = serde_json::to_value(&report)?;
             Ok((rendered, structured))
+        }
+        "radar30_discover" => {
+            let domain = args["domain"].as_str().filter(|s| !s.trim().is_empty());
+            let depth = match args["depth"].as_str() {
+                Some(d) => d.parse::<Depth>().map_err(|e| anyhow::anyhow!("{e}"))?,
+                None => Depth::Default,
+            };
+            let timeout =
+                Duration::from_secs(args["timeout_secs"].as_u64().unwrap_or(25).clamp(5, 120));
+            let no_queue = args["no_queue"].as_bool().unwrap_or(false);
+            let st = if no_queue {
+                None
+            } else {
+                let db_path = match args["db"].as_str().filter(|s| !s.trim().is_empty()) {
+                    Some(p) => PathBuf::from(p),
+                    None => store::default_db_path()?,
+                };
+                Some(Store::open(&db_path)?)
+            };
+            let sweeper = discover::LiveSweeper::default();
+            let report = discover::run(domain, depth, timeout, &sweeper, st.as_ref())?;
+            let text = discover::format_text(&report);
+            let structured = serde_json::to_value(&report)?;
+            Ok((text, structured))
+        }
+        "radar30_library_search" => {
+            let query = args["query"]
+                .as_str()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| anyhow::anyhow!("query cannot be empty"))?;
+            let limit = args["limit"].as_u64().unwrap_or(15).clamp(1, 100) as usize;
+            let bdir = match args["briefs_dir"].as_str().filter(|s| !s.trim().is_empty()) {
+                Some(p) => PathBuf::from(p),
+                None => store::default_briefs_dir()?,
+            };
+            let db_path = match args["db"].as_str().filter(|s| !s.trim().is_empty()) {
+                Some(p) => PathBuf::from(p),
+                None => store::default_db_path()?,
+            };
+            let res = library::search(query, &bdir, Some(&db_path), limit)?;
+            let text = library::format_search_text(&res);
+            let structured = serde_json::to_value(&res)?;
+            Ok((text, structured))
+        }
+        "radar30_briefing" => {
+            let weekly = args["weekly"].as_bool().unwrap_or(false);
+            let since = args["since"].as_str().filter(|s| !s.trim().is_empty());
+            let db_path = match args["db"].as_str().filter(|s| !s.trim().is_empty()) {
+                Some(p) => PathBuf::from(p),
+                None => store::default_db_path()?,
+            };
+            let st = Store::open(&db_path)?;
+            let report = briefing::generate(&st, weekly, since)?;
+            let text = briefing::format_markdown(&report);
+            let structured = serde_json::to_value(&report)?;
+            Ok((text, structured))
         }
         "radar30_preflight" => {
             let topic = args["topic"].as_str();
@@ -529,7 +664,7 @@ mod tests {
         assert!(
             lines
                 .iter()
-                .any(|m| m["id"] == 2 && m["result"]["tools"].as_array().unwrap().len() == 4)
+                .any(|m| m["id"] == 2 && m["result"]["tools"].as_array().unwrap().len() == 7)
         );
         assert!(
             lines

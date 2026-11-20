@@ -33,7 +33,11 @@ Register with local coding agents (Claude Code, Codex, Cursor, Gemini CLI, OpenC
 
 ## Commands
 
-- `radar30 research <topic>` — Parallel fetch, entity grounding, Weighted RRF fusion, clustering, and rendering (`--emit compact|md|json`)
+- `radar30 research <topic>` — Parallel fetch, entity grounding, Weighted RRF fusion, clustering, rendering (`--emit compact|md|json`), optional `--store` (SQLite) and `--save-dir`
+- `radar30 discover [domain]` — Topic-less discovery across HN & Reddit rivers with junk filtering, confidence floor, honest `nothing-solid` outcome, and repeat tracking via `topic_queue`
+- `radar30 library search|feed|queue` — Offline FTS5 + Markdown brief search, static HTML + Atom `feed.xml` builder, and discovery queue (`--cover`)
+- `radar30 watch add|remove|list|run` — Recurring watchlist topics and batch runs persisted into SQLite
+- `radar30 briefing [--weekly]` — Daily / weekly briefings aggregated from stored findings
 - `radar30 preflight [topic]` — Zero-network, zero-write forecast of sources, endpoints, query plan, and writes
 - `radar30 sources` — List all supported sources and auth modes
 - `radar30 doctor` — Check binary health, optional auth env, local agent setup, and run a live MCP stdio self-test

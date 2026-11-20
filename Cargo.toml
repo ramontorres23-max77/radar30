@@ -1,6 +1,6 @@
 [package]
 name = "radar30"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Multi-source, engagement-scored research engine for the last 30 days — single-binary Rust CLI, stdio MCP server, and Agent Skill"
 license = "MIT"
@@ -15,6 +15,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 clap = { version = "4", features = ["derive"] }
 quick-xml = "0.37"
 regex = "1"
+rusqlite = { version = "0.34", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "preserve_order"] }
 toml_edit = "0.25"
