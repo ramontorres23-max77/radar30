@@ -53,6 +53,12 @@ primary entity, fuses per-source rankings via Weighted Reciprocal Rank Fusion
 
 6. **Troubleshoot:**
    Run `radar30 doctor` (or MCP tool `radar30_doctor`) to inspect binary health,
-   agent registrations, and the live MCP self-test. For remote clients, the same
-   JSON-RPC surface is served over HTTP by `radar30 serve-http` (`POST /mcp`,
-   `GET /health`) behind the Easypanel HTTPS proxy.
+   agent registrations, and the live MCP self-test. For clients on your own
+   network, the same JSON-RPC surface is available via `radar30 serve-http`
+   (`POST /mcp`, `GET /health`).
+
+## Escopo
+
+O radar30 é um projeto **local-only**: roda na sua máquina, não há serviço,
+domínio ou deploy remoto previsto. MCP stdio é o transporte principal;
+`serve-http` é opcional e escuta apenas onde você executar o binário.

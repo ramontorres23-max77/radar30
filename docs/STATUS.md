@@ -4,7 +4,9 @@ What works today and how each part was last checked. Updated 2026-11-19.
 
 **Verified**: executed end to end against real public APIs or live stdio MCP process.
 **Tested**: covered by automated offline unit/integration tests in `cargo test`.
-**Planned**: scheduled for Waves 3–4 (see `docs/PLAN.md`).
+**Planned**: scheduled for Wave 4 (see `docs/PLAN.md`).
+
+**Escopo:** local-only por decisão — sem serviço, domínio ou deploy remoto. `serve-http` é transporte opcional na máquina do usuário.
 
 ## Wave 1 Components
 

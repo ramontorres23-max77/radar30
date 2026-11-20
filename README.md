@@ -65,7 +65,7 @@ Unconfigured BYOK lanes report `unavailable` in source coverage and never fail t
 - `radar30 doctor` — Check binary health, optional auth env, local agent setup, and run a live MCP stdio self-test
 - `radar30 setup` — Atomically register `radar30 mcp` and embedded `SKILL.md` with `.radar30.bak` backups (`--dry-run`, `--remove`)
 - `radar30 mcp` — Start the stdio JSON-RPC 2.0 MCP server (`2025-06-18`)
-- `radar30 serve-http --port 8080` — Expose the same MCP protocol over HTTP (`POST /mcp`) with `GET /health`; used by the Easypanel deployment
+- `radar30 serve-http --port 8080` — Optional local HTTP transport for the same MCP protocol (`POST /mcp`) with `GET /health`; useful for clients on your own machine/network
 
 ## Documentation
 
