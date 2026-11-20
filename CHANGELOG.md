@@ -3,7 +3,7 @@
 ## 0.5.1
 - Patent digest: anonymous USPTO session fallback and 24h local cache when Google Patents refuses requests; cached items are labeled `[from 24h cache]`.
 - Added GitHub Actions CI (fmt, clippy, tests, release build, secret scan) and a tagged-release workflow producing macOS (arm64/x86_64), Linux and Windows binaries.
-- Added `scripts/build-macos-app.sh`: a double-clickable `Radar30.app` launcher (menu for search, company intel, doctor) with ad-hoc codesign, also attached to macOS release artifacts.
+- Added `scripts/build-macos-app.sh`: a double-clickable `Radar30.app` launcher (menu for search, company intel, doctor) with ad-hoc codesign, also attached to macOS release artifacts. Launch handoff uses a `.command` file opened by LaunchServices, avoiding AppleEvents Automation prompts that could silently kill the app.
 
 ## 0.5.0
 - Wave 4: `radar30 company` (US patent publications, job signals, stock vs S&P 500 proxy), `radar30 publish`, and the `radar30_company` MCP tool (8 tools total).

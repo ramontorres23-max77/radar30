@@ -43,72 +43,73 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# A .command file is opened through LaunchServices, so no Automation permission
+# dialog (osascript "tell application Terminal") is needed.
+cat > "$OUT/Contents/Resources/radar30-menu.command" <<'MENU'
+#!/bin/bash
+# Interactive launcher menu, executed by Terminal.app when the app is opened.
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN="$HERE/../MacOS/radar30"
+
+while true; do
+  printf '\n========== radar30 ==========\n'
+  printf '1) Pesquisa rapida (30 dias)\n'
+  printf '2) Company Intel (empresa)\n'
+  printf '3) Doctor / status\n'
+  printf '4) Sair\n'
+  printf '%s\n' '-----------------------------'
+  read -rp 'Escolha [1-4]: ' option || exit 0
+  case "$option" in
+    1)
+      read -rp 'Tema ou pergunta: ' topic
+      [[ -z "$topic" ]] && continue
+      echo
+      "$BIN" research "$topic" --depth quick --emit compact
+      ;;
+    2)
+      read -rp 'Empresa: ' company
+      [[ -z "$company" ]] && continue
+      echo
+      "$BIN" company "$company" --emit compact
+      ;;
+    3)
+      echo
+      "$BIN" doctor
+      ;;
+    4|q|Q|'')
+      exit 0
+      ;;
+    *)
+      echo 'Opcao invalida.'
+      ;;
+  esac
+  printf '\n'
+  read -rp 'Enter para continuar... ' _ || exit 0
+done
+MENU
+chmod +x "$OUT/Contents/Resources/radar30-menu.command"
+
 cat > "$OUT/Contents/MacOS/radar30-launcher" <<'LAUNCHER'
 #!/bin/bash
-# Thin macOS launcher: asks what to do, then runs the bundled radar30 CLI in Terminal.
-set -euo pipefail
+# Hands off to a .command file; Terminal is opened by LaunchServices, not AppleEvents.
+set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN="$HERE/radar30"
+MENU="$HERE/../Resources/radar30-menu.command"
+LOG="$HOME/Library/Logs/radar30-launcher.log"
 
-escape_apple() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  printf '%s' "$s"
-}
+mkdir -p "$(dirname "$LOG")"
+printf '[%s] launcher started (bundle=%s)\n' "$(date -u +%FT%TZ)" "$HERE" >>"$LOG" 2>&1
 
-run_in_terminal() {
-  local cmd
-  cmd="$(escape_apple "$1")"
-  osascript -e 'tell application "Terminal" to activate' \
-            -e "tell application \"Terminal\" to do script \"$cmd\""
-}
-
-# Test hook: no GUI, prints the command that would run.
 if [[ "${RADAR30_APP_TEST:-}" == "1" ]]; then
-  choice="${RADAR30_APP_CHOICE:-1}"
-  topic="${RADAR30_APP_TOPIC:-Rust}"
-  case "$choice" in
-    1) printf 'CMD: "%s" research "%s" --depth quick --emit compact\n' "$BIN" "$topic" ;;
-    2) printf 'CMD: "%s" company "%s" --emit compact\n' "$BIN" "$topic" ;;
-    3) printf 'CMD: "%s" doctor\n' "$BIN" ;;
-    *) printf 'CMD: open -a Terminal\n' ;;
-  esac
+  printf 'CMD: open %s\n' "$MENU"
   exit 0
 fi
 
-MENU=$'Pesquisa rápida (30 dias)\nCompany Intel\nDoctor / status\nAbrir Terminal'
-selected="$(osascript \
-  -e "choose from list {\"Pesquisa rápida (30 dias)\", \"Company Intel\", \"Doctor / status\", \"Abrir Terminal\"}" \
-  -e "with prompt \"radar30 — o que quer fazer?\" default items {\"Pesquisa rápida (30 dias)\"}")" || exit 0
-[[ "$selected" == "false" ]] && exit 0
-
-ask() {
-  osascript -e "display dialog \"$1\" default answer \"$2\" buttons {\"Cancelar\", \"OK\"} default button \"OK\"" \
-            -e 'text returned of result' 2>/dev/null || true
-}
-
-case "$selected" in
-  "Pesquisa rápida (30 dias)")
-    topic="$(ask 'Tema ou pergunta:' 'Rust')"
-    [[ -z "$topic" ]] && exit 0
-    topic="${topic//\"/\'}"
-    run_in_terminal "\"$BIN\" research \"$topic\" --depth quick --emit compact"
-    ;;
-  "Company Intel")
-    company="$(ask 'Empresa:' 'Apple')"
-    [[ -z "$company" ]] && exit 0
-    company="${company//\"/\'}"
-    run_in_terminal "\"$BIN\" company \"$company\" --emit compact"
-    ;;
-  "Doctor / status")
-    run_in_terminal "\"$BIN\" doctor"
-    ;;
-  "Abrir Terminal")
-    osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script ""'
-    ;;
-esac
+if ! open "$MENU" >>"$LOG" 2>&1; then
+  printf '[%s] open failed\n' "$(date -u +%FT%TZ)" >>"$LOG" 2>&1
+  exit 1
+fi
 LAUNCHER
-
 chmod +x "$OUT/Contents/MacOS/radar30-launcher"
 echo "App bundle: $OUT"
