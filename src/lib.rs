@@ -8,6 +8,7 @@
 
 pub mod briefing;
 pub mod cluster;
+pub mod company;
 pub mod creds;
 pub mod discover;
 pub mod doctor;

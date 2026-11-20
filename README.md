@@ -65,7 +65,9 @@ Unconfigured BYOK lanes report `unavailable` in source coverage and never fail t
 - `radar30 doctor` — Check binary health, optional auth env, local agent setup, and run a live MCP stdio self-test
 - `radar30 setup` — Atomically register `radar30 mcp` and embedded `SKILL.md` with `.radar30.bak` backups (`--dry-run`, `--remove`)
 - `radar30 mcp` — Start the stdio JSON-RPC 2.0 MCP server (`2025-06-18`)
-- `radar30 serve-http --port 8080` — Optional local HTTP transport for the same MCP protocol (`POST /mcp`) with `GET /health`; useful for clients on your own machine/network
+- `radar30 serve-http --port 8080` — Optional local HTTP transport (`POST /mcp`, `GET /health`)
+- `radar30 company <name>` — Keyless company intel: US patent publications, careers-page job signals (Greenhouse/Ashby/Lever/Workday), and 30-day stock vs S&P 500 proxy (`--ticker`, `--boards`, `--emit`, `radar30/company@1`)
+- `radar30 publish --input <brief.md> --out-dir <dir>` — Render a saved Markdown brief into a standalone HTML page (local publisher)
 
 ## Documentation
 

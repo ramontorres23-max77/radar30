@@ -242,6 +242,24 @@ pub fn build_feed(briefs_dir: &Path, out_dir: &Path, site_url: &str) -> Result<F
     })
 }
 
+/// Render a saved Markdown brief as a standalone local HTML page.
+pub fn publish_markdown(input: &Path, out_dir: &Path) -> Result<PathBuf> {
+    let md =
+        std::fs::read_to_string(input).with_context(|| format!("reading {}", input.display()))?;
+    let stem = input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("brief")
+        .to_string();
+    let title = extract_title(&md).unwrap_or_else(|| stem.clone());
+    let date = extract_date(&stem, &md);
+    std::fs::create_dir_all(out_dir).with_context(|| format!("creating {}", out_dir.display()))?;
+    let target = out_dir.join(format!("{stem}.html"));
+    std::fs::write(&target, render_brief_html(&title, &date, &md))
+        .with_context(|| format!("writing {}", target.display()))?;
+    Ok(target)
+}
+
 fn render_brief_html(title: &str, date: &str, md: &str) -> String {
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>{}</title>\n<style>body{{font-family:system-ui,-apple-system,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;line-height:1.6}}pre{{white-space:pre-wrap;font-family:inherit;background:#f9fafb;padding:1rem;border-radius:8px;border:1px solid #e5e7eb}}</style>\n</head>\n<body>\n<p><a href=\"../index.html\">← Library</a> · {}</p>\n<h1>{}</h1>\n<pre>{}</pre>\n</body>\n</html>\n",

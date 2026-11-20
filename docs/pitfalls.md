@@ -20,3 +20,11 @@ Mistakes and upstream quirks documented as concrete rules so they are never repe
 - **Reddit/Bluesky public mirrors can answer HTTP 403 for non-browser TLS fingerprints.** Report an actionable `Unavailable`/`Forbidden` detail; do not retry aggressively or mask it as empty results.
 - **YouTube flat playlist entries have no reliable publish date.** `date_confidence` is low and freshness scoring falls back to a neutral value; do not claim a 30-day cutoff for `yt-dlp` metadata.
 - **X API recent search only covers about the last 7 days.** With `--days 30`, the X lane still returns recent tweets only; surface this in the preview of the lane, not as a 30-day guarantee.
+
+## Company Intelligence
+
+- **Yahoo Finance chart endpoints return HTTP 429 and Stooq serves a JS challenge here.** Use Nasdaq's keyless chart API; label `VOO` explicitly as an S&P 500 ETF proxy, not the index.
+- **Greenhouse `content=true` can return 6 MB per board.** Request `content=false` (~0.5 MB) and stay under the HTTP response cap.
+- **Google Patents XHR returns `&hellip;` and assignees in several shapes.** Decode entities and handle string/array/object assignees before rendering.
+- **Do not call patent results "first US publications" without family data.** The digest reports US publication numbers and priority dates only.
+- **Google Patents XHR can return HTTP 503 after repeated probes.** Keep it as a warning in the report; never synthesize an empty-but-successful patent section when the endpoint refused the request.

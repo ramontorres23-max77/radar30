@@ -187,7 +187,7 @@ mod tests {
         let raw = request("GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n");
         assert!(raw.starts_with("HTTP/1.1 200 OK"));
         assert!(raw.contains("\"status\":\"ok\""));
-        assert!(raw.contains("\"tools\":7"));
+        assert!(raw.contains("\"tools\":8"));
     }
 
     #[test]

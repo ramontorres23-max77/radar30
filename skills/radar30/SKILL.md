@@ -51,6 +51,14 @@ primary entity, fuses per-source rankings via Weighted Reciprocal Rank Fusion
      Polymarket odds/volume).
    - Call out single-source or degraded-coverage caveats honestly.
 
+5. **Company intelligence & local publishing:**
+   - `radar30 company "<company>"` (or MCP tool `radar30_company`) returns a
+     versioned `radar30/company@1` report: US patent publications, careers-page
+     job signals (with `Jobs Page Secret Signal` flags), and a 30-day stock vs
+     S&P 500 proxy line. Override boards with `--boards acme=greenhouse:acme`.
+   - `radar30 publish --input <brief.md> --out-dir <dir>` renders a saved brief
+     as a standalone HTML page, entirely on your machine.
+
 6. **Troubleshoot:**
    Run `radar30 doctor` (or MCP tool `radar30_doctor`) to inspect binary health,
    agent registrations, and the live MCP self-test. For clients on your own

@@ -33,6 +33,15 @@ What works today and how each part was last checked. Updated 2026-11-19.
 | `library search` & `library feed` (`index.html`, `briefs/*.html`, Atom `feed.xml`) | Verified | Live smoke run merged saved brief + FTS5 findings and built `index.html` + `feed.xml`; offline integration test covers full round-trip. |
 | `watch` (`add`, `remove`, `list`, `run`) & `briefing` (`--weekly`, `--since`) | Verified | Live `watch add` + `watch run` + `briefing` generated structured daily digest from SQLite; MCP tools `radar30_discover`, `radar30_library_search`, and `radar30_briefing` tested in `tests/wave2_workflows.rs`. |
 
+## Wave 4 Components
+
+| Component | Status | Notes |
+| --- | --- | --- |
+| Company intel jobs & finance (`src/company.rs`, `radar30/company@1`) | Verified | Live `company Stripe` returned 20 Greenhouse postings with a `Jobs Page Secret Signal` hit; live `company Apple` produced `AAPL -1.9% over 30d vs VOO -3.0%` from Nasdaq. |
+| Company intel patents (`src/company.rs`) | Tested | Parser/filter tests pass and an earlier direct probe returned 200; repeated live runs hit Google Patents HTTP 503 (rate limit), reported as a warning rather than fabricated data. |
+| `radar30_company` MCP tool & 8-tool self-test | Verified | `docs/tools.md` regenerated from registry; stdio + HTTP health report 8 tools; `doctor` PASS. |
+| Local HTML publisher (`radar30 publish`) | Verified | Saved brief rendered to standalone `.html` in a scratch directory. |
+
 ## Wave 3 Components
 
 | Component | Status | Notes |

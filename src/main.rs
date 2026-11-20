@@ -79,6 +79,33 @@ enum Cmd {
         #[arg(long)]
         offline_fixtures: Option<PathBuf>,
     },
+    /// Investigate a company: US patent publications, careers-page signals, and a finance line.
+    Company {
+        company: String,
+        /// Optional ticker override for the 30-day stock benchmark line.
+        #[arg(long)]
+        ticker: Option<String>,
+        /// Override job boards (e.g. `acme=greenhouse:acme,beta=ashby:beta`).
+        #[arg(long)]
+        boards: Option<String>,
+        #[arg(long, default_value_t = 30)]
+        days: u64,
+        #[arg(long, value_enum, default_value_t = EmitFormat::Compact)]
+        emit: EmitFormat,
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
+    },
+    /// Render a saved Markdown brief as a standalone HTML page (local publisher).
+    Publish {
+        /// Saved `.md` brief to publish.
+        #[arg(long, short)]
+        input: PathBuf,
+        /// Output directory for the generated `.html`.
+        #[arg(long, short)]
+        out_dir: PathBuf,
+    },
     /// Topic-less discovery: sweep Hacker News & Reddit rivers, enforce confidence floor, track repeats.
     Discover {
         /// Optional domain scope (e.g. "AI agents", "Rust"). Omit for global sweep.
@@ -370,6 +397,37 @@ fn run() -> Result<ExitCode> {
             } else {
                 say!("{rendered}");
             }
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Company {
+            company,
+            ticker,
+            boards,
+            days,
+            emit,
+            out,
+            timeout,
+        } => {
+            let window = RunOptions::resolve_window(days, None, None)?;
+            let report = radar30::company::run(&radar30::company::CompanyOptions {
+                company,
+                window,
+                ticker,
+                boards_override: boards,
+                timeout: Duration::from_secs(timeout.clamp(5, 120)),
+            })?;
+            let rendered = radar30::company::render(&report, emit)?;
+            if let Some(path) = out {
+                std::fs::write(&path, &rendered)
+                    .with_context(|| format!("writing {}", path.display()))?;
+            } else {
+                say!("{rendered}");
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Publish { input, out_dir } => {
+            let path = library::publish_markdown(&input, &out_dir)?;
+            say!("Published HTML: {}", path.display());
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Discover {

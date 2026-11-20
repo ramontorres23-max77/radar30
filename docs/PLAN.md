@@ -25,8 +25,9 @@ Roadmap for `radar30`, combining `rust-anything`'s single-binary Rust architectu
 - Unconfigured BYOK lanes report `unavailable` with an exact fix hint instead of failing the run; `doctor`, `preflight`, and `creds` all report readiness
 - Parser/unit tests for every new adapter; `SourceState::Unavailable` added to `radar30/research@1` telemetry
 
-## Wave 4 — Company Intelligence & Publishing
-- USPTO Patent Digest (First US publications)
-- Careers / Jobs Page Secret Signals
-- Yahoo Finance 30-day stock vs S&P 500 comparison
-- Static HTML brief publisher
+## Wave 4 — Company Intelligence & Local Publisher (Done)
+- Keyless US patent digest via Google Patents public XHR endpoint (filtered to US publications in the window, with candidate-signal flags)
+- Careers-page job signals: Greenhouse, Ashby, Lever and Workday adapters, curated board hints (`stripe`, `linear`, `ramp`), env/CLI overrides, `Jobs Page Secret Signal` flags
+- Finance line via Nasdaq keyless chart API with `VOO` (S&P 500 ETF) as benchmark proxy; explicit about the proxy instead of mislabeling it an index
+- Versioned `radar30/company@1` report + `radar30_company` MCP tool (8 tools total)
+- Local-only HTML publisher (`radar30 publish`), no remote hosting
