@@ -137,7 +137,10 @@ pub fn run(opts: &RunOptions, fetcher: &dyn SourceFetcher) -> Result<ResearchRep
     let source_outcomes: Vec<SourceOutcome> = per_source.into_values().collect();
     let mut warnings = Vec::new();
     for o in &source_outcomes {
-        if !matches!(o.state, SourceState::Ok | SourceState::NoResults) {
+        if !matches!(
+            o.state,
+            SourceState::Ok | SourceState::NoResults | SourceState::Unavailable
+        ) {
             let reason = o.detail.as_deref().unwrap_or("degraded");
             warnings.push(format!("{}: {:?} ({reason})", o.source.as_str(), o.state));
         }
@@ -163,9 +166,11 @@ pub fn run(opts: &RunOptions, fetcher: &dyn SourceFetcher) -> Result<ResearchRep
 fn merge_source_state(a: SourceState, b: SourceState) -> SourceState {
     match (a, b) {
         (SourceState::Ok, SourceState::Ok) => SourceState::Ok,
-        (SourceState::Ok, SourceState::NoResults) | (SourceState::NoResults, SourceState::Ok) => {
-            SourceState::Ok
-        }
+        (SourceState::Ok, SourceState::NoResults | SourceState::Unavailable)
+        | (SourceState::NoResults | SourceState::Unavailable, SourceState::Ok) => SourceState::Ok,
+        (SourceState::Unavailable, SourceState::Unavailable) => SourceState::Unavailable,
+        (SourceState::NoResults, SourceState::Unavailable)
+        | (SourceState::Unavailable, SourceState::NoResults) => SourceState::Unavailable,
         (SourceState::Ok, _) | (_, SourceState::Ok) => SourceState::Partial,
         (SourceState::Partial, _) | (_, SourceState::Partial) => SourceState::Partial,
         (SourceState::NoResults, other) => other,

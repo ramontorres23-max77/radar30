@@ -141,6 +141,38 @@ pub fn engagement_score(item: &SourceItem) -> f64 {
             // Academic papers have no social upvotes; neutral baseline.
             return 0.40;
         }
+        SourceId::Bluesky => {
+            let lk = item.engagement.likes.unwrap_or(0).max(0) as f64;
+            let s = item.engagement.score.unwrap_or(0).max(0) as f64;
+            let c = item.engagement.comments.unwrap_or(0).max(0) as f64;
+            (lk + 2.0 * s + c, 9.2)
+        }
+        SourceId::X => {
+            let lk = item.engagement.likes.unwrap_or(0).max(0) as f64;
+            let s = item.engagement.score.unwrap_or(0).max(0) as f64;
+            let c = item.engagement.comments.unwrap_or(0).max(0) as f64;
+            (lk + 2.0 * s + c, 9.2)
+        }
+        SourceId::YouTube => {
+            let v = item.engagement.views.unwrap_or(0).max(0) as f64;
+            (v, 13.8) // ~log1p(1M views)
+        }
+        SourceId::TikTok | SourceId::Instagram => {
+            let v = item.engagement.views.unwrap_or(0).max(0) as f64;
+            let lk = item.engagement.likes.unwrap_or(0).max(0) as f64;
+            (v + 10.0 * lk, 13.8)
+        }
+        SourceId::Threads | SourceId::LinkedIn => {
+            let lk = item.engagement.likes.unwrap_or(0).max(0) as f64;
+            let c = item.engagement.comments.unwrap_or(0).max(0) as f64;
+            (lk + 2.0 * c, 7.6)
+        }
+        SourceId::Pinterest => {
+            let s = item.engagement.score.unwrap_or(0).max(0) as f64;
+            (s, 7.6) // saves
+        }
+        SourceId::Perplexity => return 0.50,
+        SourceId::Web => return 0.40,
     };
     if raw <= 0.0 {
         return 0.0;

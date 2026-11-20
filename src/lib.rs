@@ -8,6 +8,7 @@
 
 pub mod briefing;
 pub mod cluster;
+pub mod creds;
 pub mod discover;
 pub mod doctor;
 pub mod fusion;
@@ -17,6 +18,7 @@ pub mod mcp;
 pub mod mcp_prompts;
 pub mod pipeline;
 pub mod preflight;
+pub mod process;
 pub mod query;
 pub mod render;
 pub mod schema;

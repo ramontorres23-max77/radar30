@@ -97,6 +97,7 @@ fn render_compact(report: &ResearchReport) -> String {
             SourceState::Ok => "ok",
             SourceState::NoResults => "empty",
             SourceState::Partial => "partial",
+            SourceState::Unavailable => "unavailable",
             _ => "degraded",
         };
         let detail = o
@@ -113,6 +114,19 @@ fn render_compact(report: &ResearchReport) -> String {
             o.elapsed_ms,
             detail
         );
+    }
+
+    let unconfigured: Vec<_> = report
+        .source_outcomes
+        .iter()
+        .filter(|o| o.state == SourceState::Unavailable)
+        .collect();
+    if !unconfigured.is_empty() {
+        let _ = writeln!(out, "\n## Unconfigured lanes (skipped)");
+        for o in unconfigured {
+            let detail = o.detail.as_deref().unwrap_or("not configured");
+            let _ = writeln!(out, "- {}: {detail}", o.source.as_str());
+        }
     }
 
     if !report.warnings.is_empty() {

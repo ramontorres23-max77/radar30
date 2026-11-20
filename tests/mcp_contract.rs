@@ -56,6 +56,11 @@ fn failed_mcp_call_returns_structured_error_payload() {
 fn docs_tools_md_matches_mcp_tool_registry() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/tools.md");
     let expected = mcp::render_tools_markdown();
+    // Regeneration escape hatch: RADAR30_REGEN_DOCS=1 cargo test --test mcp_contract
+    if std::env::var_os("RADAR30_REGEN_DOCS").is_some() {
+        std::fs::write(&path, &expected).expect("rewrite docs/tools.md");
+        return;
+    }
     let actual = std::fs::read_to_string(&path).expect("docs/tools.md must exist");
     assert_eq!(
         actual, expected,

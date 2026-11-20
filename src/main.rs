@@ -13,7 +13,9 @@ use radar30::pipeline::{self, RunOptions};
 use radar30::schema::{Depth, EmitFormat, SourceId};
 use radar30::sources::{self, FixtureFetcher, LiveFetcher};
 use radar30::store::{self, Store};
-use radar30::{briefing, discover, doctor, library, mcp, preflight, render, setup, watchlist};
+use radar30::{
+    briefing, creds, discover, doctor, library, mcp, preflight, render, setup, watchlist,
+};
 
 /// `println!` that stops quietly when stdout is closed (`radar30 ... | head`).
 macro_rules! say {
@@ -52,7 +54,7 @@ enum Cmd {
         /// Search depth profile.
         #[arg(long, value_enum, default_value_t = Depth::Default)]
         depth: Depth,
-        /// Comma-separated sources (reddit, hackernews/hn, github/gh, polymarket/pm, devto, arxiv).
+        /// Comma-separated sources: reddit, hackernews/hn, github/gh, polymarket/pm, bluesky/bsky, devto, arxiv, x/twitter, youtube/yt, tiktok, instagram, threads, linkedin, pinterest, perplexity, web/brave (BYOK lanes need credentials).
         #[arg(long)]
         sources: Option<String>,
         /// Output format: compact (agent-friendly), md (Markdown brief), or json (`radar30/research@1`).
@@ -147,6 +149,13 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Show credential presence (never values) or store/delete a Keychain secret.
+    Creds {
+        #[command(subcommand)]
+        command: Option<CredsCmd>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Check binary health, optional auth env, local agent configs, and run a live MCP self-test.
     Doctor {
         #[arg(long)]
@@ -169,6 +178,17 @@ enum Cmd {
     },
     /// Start the stdio JSON-RPC 2.0 MCP server.
     Mcp,
+}
+
+#[derive(Subcommand)]
+enum CredsCmd {
+    /// Store a Keychain secret read from stdin (one line; never passed as an argument).
+    Set {
+        /// Known key name, e.g. X_BEARER_TOKEN.
+        key: String,
+    },
+    /// Delete a Keychain secret by key name.
+    Delete { key: String },
 }
 
 #[derive(Subcommand)]
@@ -610,6 +630,56 @@ fn run() -> Result<ExitCode> {
                         s.endpoint,
                         s.auth
                     );
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Creds { command, json } => {
+            match command {
+                None => {
+                    let statuses = creds::status();
+                    if json {
+                        say!("{}", serde_json::to_string_pretty(&statuses)?);
+                    } else {
+                        say!("radar30 credentials (presence only, values never shown):");
+                        for s in &statuses {
+                            let origin = s.origin.unwrap_or("absent");
+                            say!(
+                                "  [{:7}] {:26} {:8} — unlocks {}",
+                                if s.present { "set" } else { "missing" },
+                                s.key,
+                                origin,
+                                s.unlocks
+                            );
+                        }
+                        if let Some(p) = creds::dotenv_present() {
+                            say!("  .env file: {}", p.display());
+                        }
+                    }
+                }
+                Some(CredsCmd::Set { key }) => {
+                    if !creds::KNOWN_KEYS.iter().any(|(k, _)| *k == key) {
+                        anyhow::bail!("unknown key `{key}` (see `radar30 creds`)");
+                    }
+                    use std::io::BufRead as _;
+                    let mut line = String::new();
+                    std::io::stdin().lock().read_line(&mut line)?;
+                    let secret = line.trim_end_matches(['\r', '\n']).to_string();
+                    if secret.is_empty() {
+                        anyhow::bail!("empty secret on stdin; nothing stored");
+                    }
+                    creds::keychain_set(&key, &secret)?;
+                    say!("Stored {key} in macOS Keychain (service radar30-{key}).");
+                }
+                Some(CredsCmd::Delete { key }) => {
+                    let removed = creds::keychain_delete(&key)?;
+                    if json {
+                        say!("{}", serde_json::json!({"key": key, "removed": removed}));
+                    } else if removed {
+                        say!("Deleted {key} from macOS Keychain.");
+                    } else {
+                        say!("No Keychain item found for {key}.");
+                    }
                 }
             }
             Ok(ExitCode::SUCCESS)

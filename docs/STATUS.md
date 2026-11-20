@@ -30,3 +30,14 @@ What works today and how each part was last checked. Updated 2026-11-19.
 | `discover` (HN front page + Reddit river sweep, junk filter, confidence floor, `nothing-solid`) | Verified | Live global sweep collected 32 items (HN 20 + Reddit 12) and ranked 10 trends; unit tests verify confidence floor, junk-shape blocking, `nothing-solid`, and repeat queue annotations. |
 | `library search` & `library feed` (`index.html`, `briefs/*.html`, Atom `feed.xml`) | Verified | Live smoke run merged saved brief + FTS5 findings and built `index.html` + `feed.xml`; offline integration test covers full round-trip. |
 | `watch` (`add`, `remove`, `list`, `run`) & `briefing` (`--weekly`, `--since`) | Verified | Live `watch add` + `watch run` + `briefing` generated structured daily digest from SQLite; MCP tools `radar30_discover`, `radar30_library_search`, and `radar30_briefing` tested in `tests/wave2_workflows.rs`. |
+
+## Wave 3 Components
+
+| Component | Status | Notes |
+| --- | --- | --- |
+| Credential chain & `radar30 creds` | Verified | Precedence env → `.env` → Keychain covered by unit tests; `radar30 creds` and `radar30 creds --json` executed live showing presence/origin only, values never printed. |
+| Bounded subprocess helper (`src/process.rs`) | Verified | Unit tests capture stdout, stdin payload, missing binary; used by `yt-dlp` and Keychain calls with own process group + wall-clock kill. |
+| X (official API v2) / ScrapeCreators (5 socials) / Perplexity / Brave | Tested | Parsers and envelope handling covered by unit tests for every adapter; live lanes unverified because no keys are configured here (`unavailable` with fix hint reported correctly by `preflight` and coverage). |
+| YouTube (`yt-dlp` flat search) | Verified | Live `research "Rust" --sources youtube --depth quick` fetched 8 video items in 1.9s with view counts and watch URLs. |
+| Bluesky (AT Protocol) | Tested | Parser unit test passes; public mirror returned HTTP 403 from this network, so the adapter now reports an actionable hint and supports authenticated AppView via `BLUESKY_HANDLE` + `BLUESKY_APP_PASSWORD` (not configured here). |
+| `doctor` credential/binary checks & MCP 7-tool self-test | Verified | `radar30 doctor` PASS with `cred:*`, `bin:yt-dlp` and live MCP self-test (7 tools in 5 ms). |

@@ -31,9 +31,31 @@ Register with local coding agents (Claude Code, Codex, Cursor, Gemini CLI, OpenC
 | **arXiv** | Atom API (`export.arxiv.org`) | Yes | Native Rust XML parser, 365-day recency window |
 | **DEV.to** | Forem API (`/api/articles`) | Opt-in | Enable with `--sources ...,devto` |
 
+## Wave 3 BYOK Sources (opt-in via `--sources`)
+
+| Source | Requirement | Notes |
+| --- | --- | --- |
+| **Bluesky** | keyless mirror (403 on many networks) or `BLUESKY_HANDLE` + `BLUESKY_APP_PASSWORD` | Authenticated canonical AppView recommended; now in the default keyless set |
+| **X / Twitter** | `X_BEARER_TOKEN` | Official X API v2 recent search (~7-day window) |
+| **YouTube** | `yt-dlp` on PATH | Keyless flat search with view counts; install with `brew install yt-dlp` |
+| **TikTok / Instagram / Threads / LinkedIn / Pinterest** | `SCRAPECREATORS_API_KEY` | ScrapeCreators paid lanes, one key for all five |
+| **Perplexity** | `PERPLEXITY_API_KEY` | Sonar synthesis with source citations |
+| **Web** | `BRAVE_API_KEY` | Brave Web Search with date-freshness filter |
+
+Credentials resolve in this order: process env → `./.env` → `~/.config/radar30/.env` → macOS Keychain (`security`, lowest priority). Values are never printed:
+
+```bash
+radar30 creds                                  # presence + origin only
+printf '%s' "$X_BEARER_TOKEN" | radar30 creds set X_BEARER_TOKEN --stdin
+radar30 creds delete X_BEARER_TOKEN
+```
+
+Unconfigured BYOK lanes report `unavailable` in source coverage and never fail the run. `radar30 preflight --sources x,youtube,tiktok` shows which lanes are ready without making network calls.
+
 ## Commands
 
 - `radar30 research <topic>` — Parallel fetch, entity grounding, Weighted RRF fusion, clustering, rendering (`--emit compact|md|json`), optional `--store` (SQLite) and `--save-dir`
+- `radar30 creds` — Show credential presence/origin (never values); `creds set <KEY> --stdin` / `creds delete <KEY>` manage macOS Keychain entries
 - `radar30 discover [domain]` — Topic-less discovery across HN & Reddit rivers with junk filtering, confidence floor, honest `nothing-solid` outcome, and repeat tracking via `topic_queue`
 - `radar30 library search|feed|queue` — Offline FTS5 + Markdown brief search, static HTML + Atom `feed.xml` builder, and discovery queue (`--cover`)
 - `radar30 watch add|remove|list|run` — Recurring watchlist topics and batch runs persisted into SQLite

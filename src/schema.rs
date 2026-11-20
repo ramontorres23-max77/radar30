@@ -118,26 +118,47 @@ pub enum SourceId {
     Polymarket,
     DevTo,
     Arxiv,
+    Bluesky,
+    X,
+    YouTube,
+    TikTok,
+    Instagram,
+    Threads,
+    LinkedIn,
+    Pinterest,
+    Perplexity,
+    Web,
 }
 
 impl SourceId {
-    pub const ALL: [SourceId; 6] = [
+    pub const ALL: [SourceId; 16] = [
         SourceId::Reddit,
         SourceId::HackerNews,
         SourceId::GitHub,
         SourceId::Polymarket,
         SourceId::DevTo,
         SourceId::Arxiv,
+        SourceId::Bluesky,
+        SourceId::X,
+        SourceId::YouTube,
+        SourceId::TikTok,
+        SourceId::Instagram,
+        SourceId::Threads,
+        SourceId::LinkedIn,
+        SourceId::Pinterest,
+        SourceId::Perplexity,
+        SourceId::Web,
     ];
 
     /// Default keyless sources enabled when `--sources` is omitted.
-    /// `devto` is opt-in (matching last30days) unless requested or included.
-    pub const DEFAULT_ENABLED: [SourceId; 5] = [
+    /// `devto` is opt-in (matching last30days); BYOK lanes activate only with a key.
+    pub const DEFAULT_ENABLED: [SourceId; 6] = [
         SourceId::Reddit,
         SourceId::HackerNews,
         SourceId::GitHub,
         SourceId::Polymarket,
         SourceId::Arxiv,
+        SourceId::Bluesky,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -148,6 +169,16 @@ impl SourceId {
             SourceId::Polymarket => "polymarket",
             SourceId::DevTo => "devto",
             SourceId::Arxiv => "arxiv",
+            SourceId::Bluesky => "bluesky",
+            SourceId::X => "x",
+            SourceId::YouTube => "youtube",
+            SourceId::TikTok => "tiktok",
+            SourceId::Instagram => "instagram",
+            SourceId::Threads => "threads",
+            SourceId::LinkedIn => "linkedin",
+            SourceId::Pinterest => "pinterest",
+            SourceId::Perplexity => "perplexity",
+            SourceId::Web => "web",
         }
     }
 
@@ -159,6 +190,16 @@ impl SourceId {
             SourceId::Polymarket => "Polymarket (Gamma)",
             SourceId::DevTo => "DEV Community (Forem)",
             SourceId::Arxiv => "arXiv (Atom API)",
+            SourceId::Bluesky => "Bluesky (AT Protocol)",
+            SourceId::X => "X / Twitter (official API)",
+            SourceId::YouTube => "YouTube (yt-dlp)",
+            SourceId::TikTok => "TikTok (ScrapeCreators)",
+            SourceId::Instagram => "Instagram Reels (ScrapeCreators)",
+            SourceId::Threads => "Threads (ScrapeCreators)",
+            SourceId::LinkedIn => "LinkedIn (ScrapeCreators)",
+            SourceId::Pinterest => "Pinterest (ScrapeCreators)",
+            SourceId::Perplexity => "Perplexity (Sonar)",
+            SourceId::Web => "Web (Brave Search)",
         }
     }
 
@@ -170,6 +211,16 @@ impl SourceId {
             SourceId::Polymarket => "https://gamma-api.polymarket.com/public-search",
             SourceId::DevTo => "https://dev.to/api/articles",
             SourceId::Arxiv => "https://export.arxiv.org/api/query",
+            SourceId::Bluesky => "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts",
+            SourceId::X => "https://api.x.com/2/tweets/search/recent",
+            SourceId::YouTube => "yt-dlp ytsearch (local binary)",
+            SourceId::TikTok => "https://api.scrapecreators.com/v1/tiktok/search/keyword",
+            SourceId::Instagram => "https://api.scrapecreators.com/v2/instagram/reels/search",
+            SourceId::Threads => "https://api.scrapecreators.com/v1/threads/search",
+            SourceId::LinkedIn => "https://api.scrapecreators.com/v1/linkedin/search/posts",
+            SourceId::Pinterest => "https://api.scrapecreators.com/v1/pinterest/search",
+            SourceId::Perplexity => "https://api.perplexity.ai/chat/completions",
+            SourceId::Web => "https://api.search.brave.com/res/v1/web/search",
         }
     }
 
@@ -177,11 +228,36 @@ impl SourceId {
     pub fn quality_weight(self) -> f64 {
         match self {
             SourceId::Arxiv => 0.90,
+            SourceId::YouTube => 0.85,
             SourceId::HackerNews => 0.80,
             SourceId::DevTo => 0.78,
             SourceId::GitHub => 0.78,
+            SourceId::Perplexity => 0.75,
+            SourceId::LinkedIn => 0.70,
+            SourceId::X => 0.68,
+            SourceId::Bluesky => 0.66,
             SourceId::Reddit => 0.65,
+            SourceId::Threads => 0.60,
+            SourceId::Web => 0.60,
+            SourceId::TikTok => 0.58,
+            SourceId::Instagram => 0.58,
             SourceId::Polymarket => 0.55,
+            SourceId::Pinterest => 0.55,
+        }
+    }
+
+    /// Credential key required for this lane, if any (YouTube needs a local binary instead).
+    pub fn required_key(self) -> Option<&'static str> {
+        match self {
+            SourceId::X => Some("X_BEARER_TOKEN"),
+            SourceId::TikTok
+            | SourceId::Instagram
+            | SourceId::Threads
+            | SourceId::LinkedIn
+            | SourceId::Pinterest => Some("SCRAPECREATORS_API_KEY"),
+            SourceId::Perplexity => Some("PERPLEXITY_API_KEY"),
+            SourceId::Web => Some("BRAVE_API_KEY"),
+            _ => None,
         }
     }
 }
@@ -203,8 +279,18 @@ impl FromStr for SourceId {
             "polymarket" | "pm" => Ok(SourceId::Polymarket),
             "devto" | "dev.to" | "dev-to" => Ok(SourceId::DevTo),
             "arxiv" => Ok(SourceId::Arxiv),
+            "bluesky" | "bsky" => Ok(SourceId::Bluesky),
+            "x" | "twitter" => Ok(SourceId::X),
+            "youtube" | "yt" => Ok(SourceId::YouTube),
+            "tiktok" => Ok(SourceId::TikTok),
+            "instagram" | "ig" | "reels" => Ok(SourceId::Instagram),
+            "threads" => Ok(SourceId::Threads),
+            "linkedin" => Ok(SourceId::LinkedIn),
+            "pinterest" => Ok(SourceId::Pinterest),
+            "perplexity" | "pplx" => Ok(SourceId::Perplexity),
+            "web" | "brave" => Ok(SourceId::Web),
             other => Err(format!(
-                "unknown source `{other}` (valid: reddit, hackernews/hn, github/gh, polymarket/pm, devto/dev.to, arxiv)"
+                "unknown source `{other}` (valid: reddit, hackernews/hn, github/gh, polymarket/pm, devto, arxiv, bluesky/bsky, x/twitter, youtube/yt, tiktok, instagram/ig, threads, linkedin, pinterest, perplexity/pplx, web/brave)"
             )),
         }
     }
@@ -280,6 +366,10 @@ pub struct Engagement {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stars: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub views: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub likes: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub volume_usd: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub probability: Option<f64>,
@@ -291,6 +381,8 @@ impl Engagement {
         self.score = max_opt_i64(self.score, other.score);
         self.comments = max_opt_i64(self.comments, other.comments);
         self.stars = max_opt_i64(self.stars, other.stars);
+        self.views = max_opt_i64(self.views, other.views);
+        self.likes = max_opt_i64(self.likes, other.likes);
         self.volume_usd = max_opt_f64(self.volume_usd, other.volume_usd);
         if self.probability.is_none() {
             self.probability = other.probability;
@@ -307,7 +399,8 @@ impl Engagement {
         let s = self.score.unwrap_or(0).max(0) as f64;
         let c = self.comments.unwrap_or(0).max(0) as f64;
         let st = self.stars.unwrap_or(0).max(0) as f64;
-        s + c + st
+        let lk = self.likes.unwrap_or(0).max(0) as f64;
+        s + c + st + lk
     }
 }
 
@@ -454,6 +547,8 @@ pub enum SourceState {
     Forbidden,
     Timeout,
     Unreachable,
+    /// Lane not activated: missing credential or local binary (expected, not a failure).
+    Unavailable,
     Error,
 }
 
@@ -524,16 +619,14 @@ mod tests {
         let mut a = Engagement {
             score: Some(10),
             comments: Some(50),
-            stars: None,
-            volume_usd: None,
-            probability: None,
+            ..Default::default()
         };
         let b = Engagement {
             score: Some(120),
             comments: Some(20),
             stars: Some(500),
-            volume_usd: None,
             probability: Some(0.75),
+            ..Default::default()
         };
         a.merge_max(&b);
         assert_eq!(a.score, Some(120));

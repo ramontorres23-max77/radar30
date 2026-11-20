@@ -57,9 +57,7 @@ pub fn fetch(
     timeout: Duration,
     deadline: Instant,
 ) -> Result<(Vec<SourceItem>, Option<String>), HttpError> {
-    let token = std::env::var("GITHUB_TOKEN")
-        .ok()
-        .filter(|s| !s.trim().is_empty());
+    let token = crate::creds::resolve("GITHUB_TOKEN");
     let limit = match token {
         Some(_) => depth.source_fetch_limit().min(30),
         None => depth.source_fetch_limit().min(UNAUTH_CAP),

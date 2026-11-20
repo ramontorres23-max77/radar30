@@ -28,7 +28,7 @@ pub struct PlannedSource {
     pub id: SourceId,
     pub name: &'static str,
     pub endpoint: &'static str,
-    pub auth_mode: &'static str,
+    pub auth_mode: String,
 }
 
 /// Build a preflight report without performing any network calls or file writes.
@@ -39,21 +39,37 @@ pub fn inspect(
     sources: &[SourceId],
     out_file: Option<PathBuf>,
 ) -> PreflightReport {
-    let github_token_present = std::env::var("GITHUB_TOKEN")
-        .ok()
-        .is_some_and(|s| !s.trim().is_empty());
+    let github_token_present = crate::creds::resolve("GITHUB_TOKEN").is_some();
 
     let planned_sources = sources
         .iter()
-        .map(|&id| PlannedSource {
-            id,
-            name: id.display_name(),
-            endpoint: id.endpoint_summary(),
-            auth_mode: match id {
-                SourceId::GitHub if github_token_present => "authenticated (GITHUB_TOKEN)",
-                SourceId::GitHub => "anonymous (set GITHUB_TOKEN for higher limits)",
-                _ => "keyless",
-            },
+        .map(|&id| {
+            let auth_mode = match crate::sources::required_credential(id) {
+                Some(key) => match crate::creds::resolve_origin(key) {
+                    Some(origin) => format!("configured {key} via {}", origin.label()),
+                    None => format!("unavailable: missing {key}"),
+                },
+                None if id == SourceId::YouTube => {
+                    if crate::process::on_path("yt-dlp") {
+                        "yt-dlp on PATH".to_string()
+                    } else {
+                        "unavailable: yt-dlp not on PATH".to_string()
+                    }
+                }
+                None if id == SourceId::GitHub && github_token_present => {
+                    "authenticated (GITHUB_TOKEN)".to_string()
+                }
+                None if id == SourceId::GitHub => {
+                    "anonymous (set GITHUB_TOKEN for higher limits)".to_string()
+                }
+                None => "keyless".to_string(),
+            };
+            PlannedSource {
+                id,
+                name: id.display_name(),
+                endpoint: id.endpoint_summary(),
+                auth_mode,
+            }
         })
         .collect();
 

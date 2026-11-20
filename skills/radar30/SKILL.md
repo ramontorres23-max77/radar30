@@ -1,6 +1,6 @@
 ---
 name: radar30
-description: Use when researching topics over the last 30 days, discovering trends, or searching saved research briefs across Reddit, HN, GitHub, Polymarket, DEV.to, and arXiv.
+description: Use when researching topics over the last 30 days, discovering trends, searching saved research briefs, or configuring BYOK research lanes across Reddit, HN, GitHub, Bluesky, X, YouTube, ScrapeCreators socials, and web search.
 ---
 
 # radar30
@@ -24,6 +24,12 @@ primary entity, fuses per-source rankings via Weighted Reciprocal Rank Fusion
      and `--save-dir ~/Documents/Radar30` to save a dated Markdown brief.
    - Use `--depth quick|default|deep`, `--days N`, `--from`/`--to`, `--sources ...`,
      or `--emit json` (`radar30/research@1`).
+   - Keyless lanes: `reddit`, `hackernews`, `github`, `polymarket`, `bluesky`,
+     `devto`, `arxiv`. BYOK lanes (opt-in): `x`, `youtube`, `tiktok`,
+     `instagram`, `threads`, `linkedin`, `pinterest`, `perplexity`, `web`.
+   - Check lane readiness with `radar30 creds` (presence only) or
+     `radar30 preflight --sources x,youtube,tiktok` (zero network calls). Missing
+     credentials appear as `unavailable`, never as fatal errors.
 
 3. **Topic-less Discovery:**
    Run `radar30 discover [domain]` (or MCP tool `radar30_discover`) to sweep

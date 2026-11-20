@@ -18,10 +18,12 @@ Roadmap for `radar30`, combining `rust-anything`'s single-binary Rust architectu
 - `radar30 watch` (`add`/`remove`/`list`/`run`) & `radar30 briefing [--weekly]`
 - MCP tools expanded to 7 (`radar30_discover`, `radar30_library_search`, `radar30_briefing`) + updated `SKILL.md` and `docs/tools.md`
 
-## Wave 3 — BYOK Social Lanes & Secure Credentials
-- macOS Keychain + `.env` credential resolution (lowest-priority Keychain fallback)
-- X/Twitter lane (official X API / xAI / Xquik with explicit backend chain)
-- YouTube (`yt-dlp` transcript extraction), Bluesky (AT Protocol), ScrapeCreators (TikTok, Instagram Reels, Threads, LinkedIn, Pinterest), Perplexity & Brave Web Search
+## Wave 3 — BYOK Social Lanes & Secure Credentials (Done)
+- Credential chain (`src/creds.rs`): process env → `./.env` → `~/.config/radar30/.env` → macOS Keychain; `radar30 creds` prints presence/origin only, `creds set <KEY> --stdin` writes via `security -i` so secrets never enter argv
+- Bounded subprocess discipline (`src/process.rs`) for `yt-dlp` and `security`: own process group, stdin control, wall-clock kill
+- 10 new source lanes: Bluesky (AT Protocol, authenticated AppView or public mirror), X (official X API v2 recent search), YouTube (`yt-dlp` flat search), 5 ScrapeCreators socials, Perplexity Sonar, Brave Web Search
+- Unconfigured BYOK lanes report `unavailable` with an exact fix hint instead of failing the run; `doctor`, `preflight`, and `creds` all report readiness
+- Parser/unit tests for every new adapter; `SourceState::Unavailable` added to `radar30/research@1` telemetry
 
 ## Wave 4 — Company Intelligence & Publishing
 - USPTO Patent Digest (First US publications)

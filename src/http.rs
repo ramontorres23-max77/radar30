@@ -169,6 +169,86 @@ pub fn get_json<T: DeserializeOwned>(
     })
 }
 
+/// Perform a bounded HTTP POST with a JSON body and deserialize the JSON response.
+pub fn post_json<T: DeserializeOwned>(
+    url: &str,
+    headers: &[(&str, &str)],
+    body: &serde_json::Value,
+    per_req_timeout: Duration,
+    deadline: Instant,
+    max_retries: usize,
+) -> Result<T, HttpError> {
+    let payload = serde_json::to_string(body).map_err(|e| HttpError::Decode {
+        detail: format!("body encode: {e}"),
+    })?;
+    let mut attempt = 0usize;
+    loop {
+        let now = Instant::now();
+        if now >= deadline {
+            return Err(HttpError::Timeout {
+                detail: "deadline exceeded before request".to_string(),
+            });
+        }
+        let timeout = per_req_timeout
+            .min(deadline.saturating_duration_since(now))
+            .max(Duration::from_millis(250));
+
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .timeout_global(Some(timeout))
+            .http_status_as_error(false)
+            .user_agent(USER_AGENT)
+            .build()
+            .into();
+
+        let mut req = agent.post(url).header("Content-Type", "application/json");
+        for (k, v) in headers {
+            req = req.header(*k, *v);
+        }
+        match req.send(payload.as_str()) {
+            Ok(mut resp) => {
+                let status = resp.status().as_u16();
+                let text = read_bounded(resp.body_mut().as_reader())?;
+                if status == 429 && attempt < max_retries {
+                    let backoff =
+                        Duration::from_millis(800 * (1u64 << attempt)).min(Duration::from_secs(4));
+                    if Instant::now() + backoff < deadline {
+                        std::thread::sleep(backoff);
+                        attempt += 1;
+                        continue;
+                    }
+                }
+                if status == 429 {
+                    return Err(HttpError::RateLimited {
+                        status,
+                        detail: truncate(&text, 160),
+                    });
+                }
+                if status == 401 || status == 403 {
+                    return Err(HttpError::Forbidden {
+                        detail: truncate(&text, 160),
+                    });
+                }
+                if !(200..300).contains(&status) {
+                    return Err(HttpError::Status {
+                        status,
+                        detail: truncate(&text, 160),
+                    });
+                }
+                return serde_json::from_str(&text).map_err(|e| HttpError::Decode {
+                    detail: format!("invalid JSON: {e}"),
+                });
+            }
+            Err(err) => {
+                let msg = err.to_string();
+                if msg.to_ascii_lowercase().contains("timeout") {
+                    return Err(HttpError::Timeout { detail: msg });
+                }
+                return Err(HttpError::Unreachable { detail: msg });
+            }
+        }
+    }
+}
+
 fn read_bounded<R: Read>(reader: R) -> Result<String, HttpError> {
     let mut buf = Vec::new();
     reader

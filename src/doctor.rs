@@ -92,34 +92,48 @@ fn current_exe_canonical() -> PathBuf {
 }
 
 fn core_checks(exe: &Path) -> Vec<Check> {
-    let gh_token = std::env::var("GITHUB_TOKEN")
-        .ok()
-        .is_some_and(|v| !v.trim().is_empty());
+    let mut checks = vec![Check {
+        name: "binary".to_string(),
+        status: Status::Ok,
+        required: true,
+        detail: format!("radar30 {} ({})", env!("CARGO_PKG_VERSION"), exe.display()),
+        fix: None,
+    }];
 
-    vec![
-        Check {
-            name: "binary".to_string(),
-            status: Status::Ok,
-            required: true,
-            detail: format!("radar30 {} ({})", env!("CARGO_PKG_VERSION"), exe.display()),
-            fix: None,
-        },
-        Check {
-            name: "env:GITHUB_TOKEN".to_string(),
-            status: if gh_token {
-                Status::Ok
-            } else {
-                Status::Missing
-            },
+    for (key, unlocks) in crate::creds::KNOWN_KEYS {
+        let origin = crate::creds::resolve_origin(key);
+        let present = origin.is_some();
+        checks.push(Check {
+            name: format!("cred:{key}"),
+            status: if present { Status::Ok } else { Status::Missing },
             required: false,
-            detail: if gh_token {
-                "set (authenticated GitHub REST rate limits)".to_string()
+            detail: if present {
+                format!(
+                    "set via {} (unlocks {unlocks})",
+                    origin.expect("present credential has origin").label()
+                )
             } else {
-                "not set (GitHub runs in conservative anonymous tier)".to_string()
+                format!("absent (unlocks {unlocks}; lane stays unavailable)")
             },
-            fix: (!gh_token).then(|| "export GITHUB_TOKEN=$(gh auth token)".to_string()),
+            fix: (!present)
+                .then(|| format!("radar30 creds set {key} --stdin  # pipe the secret via stdin")),
+        });
+    }
+
+    let ytdlp = crate::process::on_path("yt-dlp");
+    checks.push(Check {
+        name: "bin:yt-dlp".to_string(),
+        status: if ytdlp { Status::Ok } else { Status::Missing },
+        required: false,
+        detail: if ytdlp {
+            "found on PATH (YouTube lane enabled)".to_string()
+        } else {
+            "not found (YouTube lane stays unavailable)".to_string()
         },
-    ]
+        fix: (!ytdlp).then(|| "brew install yt-dlp".to_string()),
+    });
+
+    checks
 }
 
 fn agent_checks(home: &Path, exe: &Path) -> Vec<Check> {

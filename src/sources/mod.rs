@@ -1,11 +1,17 @@
 //! Keyless source adapters and injectable `SourceFetcher` trait for deterministic testing.
 
 pub mod arxiv;
+pub mod bluesky;
 pub mod devto;
 pub mod github;
 pub mod hackernews;
+pub mod perplexity;
 pub mod polymarket;
 pub mod reddit;
+pub mod scrapecreators;
+pub mod web;
+pub mod x;
+pub mod youtube;
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -43,11 +49,38 @@ pub fn describe_all() -> Vec<SourceDescriptor> {
             default_enabled: SourceId::DEFAULT_ENABLED.contains(&id),
             auth: match id {
                 SourceId::GitHub => "keyless (optional GITHUB_TOKEN for higher rate limits)",
+                SourceId::Bluesky => {
+                    "optional BLUESKY_HANDLE/BLUESKY_APP_PASSWORD, else public mirror"
+                }
+                SourceId::X => "requires X_BEARER_TOKEN",
+                SourceId::YouTube => "requires yt-dlp on PATH",
+                SourceId::TikTok
+                | SourceId::Instagram
+                | SourceId::Threads
+                | SourceId::LinkedIn
+                | SourceId::Pinterest => "requires SCRAPECREATORS_API_KEY",
+                SourceId::Perplexity => "requires PERPLEXITY_API_KEY",
+                SourceId::Web => "requires BRAVE_API_KEY",
                 _ => "keyless (public API)",
             },
             endpoint: id.endpoint_summary(),
         })
         .collect()
+}
+
+/// Credential or local binary required to activate a lane (`None` for keyless sources).
+pub fn required_credential(source: SourceId) -> Option<&'static str> {
+    match source {
+        SourceId::X => Some("X_BEARER_TOKEN"),
+        SourceId::TikTok
+        | SourceId::Instagram
+        | SourceId::Threads
+        | SourceId::LinkedIn
+        | SourceId::Pinterest => Some("SCRAPECREATORS_API_KEY"),
+        SourceId::Perplexity => Some("PERPLEXITY_API_KEY"),
+        SourceId::Web => Some("BRAVE_API_KEY"),
+        _ => None,
+    }
 }
 
 /// Parse a comma-separated list of source names/aliases (e.g. `"reddit,hn,gh"`).
@@ -107,6 +140,30 @@ impl SourceFetcher for LiveFetcher {
         deadline: Instant,
     ) -> FetchOutcome {
         let started = Instant::now();
+        // BYOK lanes degrade visibly instead of failing the whole run when unconfigured.
+        if source == SourceId::YouTube && !crate::process::on_path("yt-dlp") {
+            return FetchOutcome {
+                source,
+                state: SourceState::Unavailable,
+                items: Vec::new(),
+                elapsed_ms: started.elapsed().as_millis() as u64,
+                detail: Some("yt-dlp not on PATH; install it (brew install yt-dlp)".to_string()),
+            };
+        }
+        if let Some(key) = required_credential(source)
+            && crate::creds::resolve(key).is_none()
+        {
+            return FetchOutcome {
+                source,
+                state: SourceState::Unavailable,
+                items: Vec::new(),
+                elapsed_ms: started.elapsed().as_millis() as u64,
+                detail: Some(format!(
+                    "missing {key}; set it via env, ~/.config/radar30/.env, or `radar30 creds set {key} --stdin`"
+                )),
+            };
+        }
+
         let res = match source {
             SourceId::HackerNews => {
                 hackernews::fetch(query, window, depth, self.per_request_timeout, deadline)
@@ -126,6 +183,49 @@ impl SourceFetcher for LiveFetcher {
             SourceId::Arxiv => {
                 arxiv::fetch(query, window, depth, self.per_request_timeout, deadline)
             }
+            SourceId::Bluesky => {
+                bluesky::fetch(query, window, depth, self.per_request_timeout, deadline)
+            }
+            SourceId::YouTube => {
+                youtube::fetch(query, window, depth, self.per_request_timeout, deadline)
+            }
+            SourceId::X => x::fetch(
+                query,
+                window,
+                depth,
+                self.per_request_timeout,
+                deadline,
+                &crate::creds::resolve("X_BEARER_TOKEN").unwrap_or_default(),
+            ),
+            SourceId::TikTok
+            | SourceId::Instagram
+            | SourceId::Threads
+            | SourceId::LinkedIn
+            | SourceId::Pinterest => scrapecreators::fetch(
+                source,
+                query,
+                window,
+                depth,
+                self.per_request_timeout,
+                deadline,
+                &crate::creds::resolve("SCRAPECREATORS_API_KEY").unwrap_or_default(),
+            ),
+            SourceId::Perplexity => perplexity::fetch(
+                query,
+                window,
+                depth,
+                self.per_request_timeout,
+                deadline,
+                &crate::creds::resolve("PERPLEXITY_API_KEY").unwrap_or_default(),
+            ),
+            SourceId::Web => web::fetch(
+                query,
+                window,
+                depth,
+                self.per_request_timeout,
+                deadline,
+                &crate::creds::resolve("BRAVE_API_KEY").unwrap_or_default(),
+            ),
         };
         let elapsed_ms = started.elapsed().as_millis() as u64;
         match res {

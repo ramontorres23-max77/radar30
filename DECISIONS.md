@@ -22,3 +22,12 @@ Architectural and product choices for `radar30`, with reasons. Each decision can
 | S4 | Filter HN minimum points client-side after 2x overfetch instead of Algolia `numericFilters=points>N`. | HN Algolia rejects `points` in `numericFilters` with HTTP 400. |
 | S5 | Weighted RRF (`K = 60`), conservative head-token entity grounding, out-of-window partitioning, and greedy + MMR clustering. | Prevents off-topic viral posts and stale out-of-window items from outranking recent, corroborated on-entity signal. |
 | S6 | `setup` writes Claude/Codex/Cursor/Gemini/OpenCode MCP configs atomically with `.radar30.bak` backups and installs `SKILL.md` for Claude/Codex/OpenCode/Hermes (without mutating `~/.hermes/config.yaml` comments). | Preserves user settings and YAML comments safely while giving zero-friction skill installation. |
+
+## Wave 3 Decisions
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| C1 | Secrets resolve env → project `.env` → user `.env` → macOS Keychain; `radar30 creds` prints presence/origin only, and `creds set` pipes the secret into `security -i` stdin. | Keeps secrets out of chat, argv, source files, and MCP responses while remaining usable from cron and interactive shells. |
+| C2 | Missing BYOK credentials produce `SourceState::Unavailable` (expected) rather than `Error` (degraded). | A run with 5 keyless sources and 1 unconfigured paid lane should report full coverage, not look partially broken. |
+| C3 | YouTube via `yt-dlp` flat playlist search, not transcript downloads in Wave 3. | Metadata + view counts give engagement ranking with one bounded subprocess; transcripts are a separate, slower lane. |
+| C4 | Bluesky prefers authenticated `api.bsky.app` with an app password and falls back to the public mirror. | The public mirror returns HTTP 403 on many networks; app-password auth is free and uses the canonical AppView. |
