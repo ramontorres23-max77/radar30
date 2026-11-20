@@ -1,6 +1,6 @@
 [package]
 name = "radar30"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 description = "Multi-source, engagement-scored research engine for the last 30 days — single-binary Rust CLI, stdio MCP server, and Agent Skill"
 license = "MIT"

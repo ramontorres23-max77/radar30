@@ -19,12 +19,16 @@ Prebuilt binaries (macOS arm64/x86_64, Linux x86_64, Windows x86_64) are attache
 cargo install --git https://github.com/ramontorres23-max77/radar30
 ```
 
-On macOS you can also build a double-clickable `Radar30.app` (a thin launcher for the CLI, with a menu for quick search, company intel and doctor):
+On macOS, build the **native SwiftUI app** — a real three-pane research dashboard that drives the bundled Rust CLI:
 
 ```bash
-./scripts/build-macos-app.sh        # produces dist/Radar30.app
+./scripts/build-macos-ui-app.sh   # produces dist/Radar30.app
 open dist/Radar30.app
 ```
+
+It uses an original editorial design (coral accent, serif headlines, metric cards) inspired by the *News & Magazines* templates in [Awesome-UI-Templates](https://github.com/KKshitiz/Awesome-UI-Templates); no template assets are bundled. The older Terminal-launcher build remains available as `scripts/build-macos-app.sh`.
+
+macOS release artifacts include `Radar30-<target>.zip` with the signed `.app`. The app logs CLI invocations to `~/Library/Logs/radar30-ui.log`.
 
 Register with local coding agents (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes):
 

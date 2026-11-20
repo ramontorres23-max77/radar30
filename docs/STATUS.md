@@ -1,6 +1,6 @@
 # Status
 
-What works today and how each part was last checked. Updated 2026-11-19.
+What works today and how each part was last checked. Updated 2026-11-20.
 
 **Verified**: executed end to end against real public APIs or live stdio MCP process.
 **Tested**: covered by automated offline unit/integration tests in `cargo test`.
@@ -41,6 +41,15 @@ What works today and how each part was last checked. Updated 2026-11-19.
 | Company intel patents (`src/company.rs`) | Verified | Google Patents was rate-limited (503) in live runs; the anonymous USPTO session fallback returned 12 real US publications for Stripe with dates and assignees. Cache path tested live in a scratch DB path. |
 | `radar30_company` MCP tool & 8-tool self-test | Verified | `docs/tools.md` regenerated from registry; stdio + HTTP health report 8 tools; `doctor` PASS. |
 | Local HTML publisher (`radar30 publish`) | Verified | Saved brief rendered to standalone `.html` in a scratch directory. |
+
+## macOS UI App (0.5.2)
+
+| Component | Status | Notes |
+| --- | --- | --- |
+| Native SwiftUI app (`macos/Radar30App.swift`) | Verified | Compiled with `swiftc`, installed at `~/Applications/Radar30.app`, opened from Finder. AX tree shows sidebar, metric cards (35 / 15 / 15 / 4-6), result rows and detail action. |
+| CLI bridge (`Process` → bundled `radar30-cli`) | Verified | App log shows `research Rust --depth quick --emit json` → `ok: 21539 bytes` from the embedded Rust binary. |
+| Bundle (`scripts/build-macos-ui-app.sh`, icon, ad-hoc codesign) | Verified | `plutil -lint` OK, `codesign --verify --deep --strict` OK, `Info.plist` v0.5.2, original generated `.icns`. |
+| Visual screenshot review | Blocked | macOS denied ScreenCaptureKit/TCC permission in this environment; layout verified through the accessibility tree only. |
 
 ## Wave 3 Components
 

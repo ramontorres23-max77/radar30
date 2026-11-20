@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.2
+- Native macOS SwiftUI app replaces the Terminal launcher: three-pane research dashboard, company intel, library/status panes, original icon and ad-hoc codesign. Drives the bundled Rust CLI; no API keys required.
+- Design inspired by the News & Magazines templates in `Awesome-UI-Templates`; no template assets copied.
+- Release workflow now builds and publishes the native `.app` zip for both macOS targets. App invocations are logged to `~/Library/Logs/radar30-ui.log`.
+
 ## 0.5.1
 - Patent digest: anonymous USPTO session fallback and 24h local cache when Google Patents refuses requests; cached items are labeled `[from 24h cache]`.
 - Added GitHub Actions CI (fmt, clippy, tests, release build, secret scan) and a tagged-release workflow producing macOS (arm64/x86_64), Linux and Windows binaries.

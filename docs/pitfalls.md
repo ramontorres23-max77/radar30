@@ -28,3 +28,10 @@ Mistakes and upstream quirks documented as concrete rules so they are never repe
 - **Google Patents XHR returns `&hellip;` and assignees in several shapes.** Decode entities and handle string/array/object assignees before rendering.
 - **Do not call patent results "first US publications" without family data.** The digest reports US publication numbers and priority dates only.
 - **Google Patents XHR can return HTTP 503 after repeated probes.** Fall back to the anonymous USPTO session (`/api/users/me/session` + `/api/searches/searchWithBeFamily`), then to a 24h cache; never synthesize an empty-but-successful patent section.
+
+## macOS Packaging
+
+- **APFS is case-insensitive by default.** A helper named `radar30` is the same file as the app executable `Radar30`; `swiftc -o .../Radar30` overwrote the bundled CLI. Name the helper `radar30-cli`.
+- **`iconutil` refuses a directory without the `.iconset` extension.** Build the icons in `AppIcon.iconset`, then convert with `iconutil -c icns`.
+- **A shell-script `CFBundleExecutable` using `osascript` can die silently when Finder launches it.** A native SwiftUI executable, or a `.command` handoff via LaunchServices, avoids the Automation prompt.
+- **ScreenCaptureKit needs TCC approval.** When screenshot capture is denied, verify a native app through its accessibility tree and an invocation log instead of pixels.

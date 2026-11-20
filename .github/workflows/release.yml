@@ -39,12 +39,11 @@ jobs:
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/radar30${{ matrix.ext }}" \
              "dist/radar30-${{ matrix.target }}${{ matrix.ext }}"
-      - name: Build macOS app bundle
+      - name: Build native SwiftUI macOS app
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          ./scripts/build-macos-app.sh "target/${{ matrix.target }}/release/radar30" "dist/Radar30.app"
-          codesign --force --deep --sign - dist/Radar30.app
+          ./scripts/build-macos-ui-app.sh "target/${{ matrix.target }}/release/radar30" "dist/Radar30.app"
           ditto -c -k --sequesterRsrc dist/Radar30.app "dist/Radar30-${{ matrix.target }}.zip"
       - uses: actions/upload-artifact@v4
         with:
